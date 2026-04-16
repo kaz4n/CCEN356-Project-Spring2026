@@ -1,0 +1,87 @@
+"""
+Secured HTTPS Server — Flask HTTPS on port 8443 with security headers.
+
+Generate certificates first:
+    openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+      -keyout server/key.pem -out server/cert.pem \
+      -subj "/CN=192.168.2.10/O=CCEN356Lab"
+
+Run on Server PC (192.168.2.10):
+    python3 secured_server.py
+"""
+
+from flask import Flask, render_template, request, abort
+import logging
+import os
+
+# Logging
+logging.basicConfig(
+    filename='server.log',
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger('secured_server')
+
+app = Flask(
+    __name__,
+    template_folder=os.path.join(os.path.dirname(__file__), 'templates')
+)
+
+
+@app.before_request
+def validate_path():
+    if '..' in request.path:
+        logger.warning(f"Directory traversal attempt from {request.remote_addr}: {request.path}")
+        abort(403)
+
+
+@app.after_request
+def add_security_headers(response):
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    response.headers['Content-Security-Policy'] = "default-src 'self'"
+    logger.info(f"Request from {request.remote_addr}: {request.method} {request.path} — {response.status_code}")
+    return response
+
+
+@app.route('/')
+def home():
+    return render_template('index.html')
+
+
+@app.route('/show-something')
+def show():
+    return render_template('show.html')
+
+
+@app.errorhandler(403)
+def forbidden(e):
+    return "<h1>403 Forbidden</h1><p>Access denied.</p>", 403
+
+
+@app.errorhandler(404)
+def not_found(e):
+    return "<h1>404 Not Found</h1><p>The requested page does not exist.</p>", 404
+
+
+@app.errorhandler(500)
+def internal_error(e):
+    return "<h1>500 Internal Server Error</h1><p>Something went wrong.</p>", 500
+
+
+if __name__ == '__main__':
+    cert_path = os.path.join(os.path.dirname(__file__), 'cert.pem')
+    key_path = os.path.join(os.path.dirname(__file__), 'key.pem')
+
+    if not os.path.exists(cert_path) or not os.path.exists(key_path):
+        print("ERROR: cert.pem and key.pem not found in server/ directory.")
+        print("Generate them with:")
+        print("  openssl req -x509 -nodes -days 365 -newkey rsa:2048 \\")
+        print("    -keyout server/key.pem -out server/cert.pem \\")
+        print('    -subj "/CN=192.168.2.10/O=CCEN356Lab"')
+        exit(1)
+
+    print("HTTPS server starting on https://0.0.0.0:8443")
+    app.run(host='0.0.0.0', port=8443, ssl_context=(cert_path, key_path))

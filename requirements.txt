@@ -1,0 +1,10 @@
+flask>=2.3
+werkzeug>=2.3
+pyopenssl>=23.2
+netmiko
+scapy
+matplotlib
+pandas
+requests
+paramiko
+urllib3

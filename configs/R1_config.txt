@@ -1,0 +1,5 @@
+! R1 Running Configuration
+! Export this from router: show running-config
+! Paste full output here after lab setup.
+!
+! Expected config: see REFERENCE_PROMPT.md → Cisco Router Configurations → R1
